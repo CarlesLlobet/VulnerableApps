@@ -71,7 +71,7 @@ Now the application has the password of the attacker at choice, and he could ove
 
 | Analysis  | Tool used | Anti RE |       Username      |  Password  |
 |-----------|-----------|---------|---------------------|------------|
-|  Dynamic  |    N/A    |    No   |  `a' OR '1'='1--`  |    N/A     |
+|  Dynamic  |    N/A    |    No   |  `a' OR '1'='1'--`  |    N/A     |
 
 In this application, the login has already been implemented with a proper database, but the query used seems to be vulnerable to SQL injection, as it has not been properly parametrized. 
 
@@ -95,7 +95,7 @@ public boolean loginUser (String username, String password) {
 
 ### Solution 1  
     
-As the query is vulnerable to SQLinjection, by just inputting `a' OR '1'='1--` we bypass the login successfully.
+As the query is vulnerable to SQLinjection, by just inputting `a' OR '1'='1'--` we bypass the login successfully.
 
 ## VulnApp2 
 
@@ -202,7 +202,7 @@ if(Java.available){
 }
 ```
 
-When executing it, we see that there is a Log Leakage that indicates wether the login was successful or not, and it is called by the function "b.a.a.a.a.a", so we can apply the hook on VulnApp2 to this function, and we also bypass the login:
+When executing it, we see that there is a Log Leakage that indicates whether the login was successful or not, and it is called by the function "b.a.a.a.a.a", so we can apply the hook on VulnApp2 to this function, and we also bypass the login:
 
 ```java
 if(Java.available){
@@ -234,6 +234,7 @@ In order to get into this application if its obfuscated and there are no logs, w
 First we have to copy the database to a world-readable directory, as the application directory is not readable from the outside (without root), and pull it:
 ```bash
 adb shell
+su
 cp /data/user/0/com.isrc.VulnApp4/databases/db /sdcard
 exit
 exit
@@ -308,10 +309,10 @@ if(Java.available){
     Java.perform(function () {
         var mainActivity = Java.use("com.isrc.VulnApp5.Domain.MainActivity");
         mainActivity.a.overload().implementation = function(){
-            send("isDeviceRooted() called!";
+            send("isDeviceRooted() called!");
             res = false;
-            send("Hooked Successfully! Modified result to false");
-            return res;
+            send("Hooked Successfully! Modified result to false")
+            return res
         };
     });
     send("Java ready");
@@ -324,57 +325,211 @@ A better solution and much more generic, would be to hook the system functions w
 
 ```java
 if(Java.available){
-    Java.perform(function () {
-        var file = Java.use("java.io.File");
-        
-        java.lang.String[] paths = {"/system", "/system/bin", "/sbin", "/system/xbin", "/system/bin/.ext", "/system/usr/we-need-root/su-backup", "/data/local", "/data/local/bin", "/data/local/xbin", "/su/bin", "/system/bin/.ext",
-            "/system/bin/failsafe", "system/sd/xbin", "system/usr/we-need-root", "/system/app", "/cache", "/data", "/dev"};
-        java.lang.String[] filenames = {"su", ".su", "mu", "su2", ".su2", "busybox", "superuser.apk"};
+    Java.perform(function() {
+        var RootPackages = ["com.noshufou.android.su", "com.noshufou.android.su.elite", "eu.chainfire.supersu",
+            "com.koushikdutta.superuser", "com.thirdparty.superuser", "com.yellowes.su", "com.koushikdutta.rommanager",
+            "com.koushikdutta.rommanager.license", "com.dimonvideo.luckypatcher", "com.chelpus.lackypatch",
+            "com.ramdroid.appquarantine", "com.ramdroid.appquarantinepro", "com.devadvance.rootcloak", "com.devadvance.rootcloakplus",
+            "de.robv.android.xposed.installer", "com.saurik.substrate", "com.zachspong.temprootremovejb", "com.amphoras.hidemyroot",
+            "com.amphoras.hidemyrootadfree", "com.formyhm.hiderootPremium", "com.formyhm.hideroot", "me.phh.superuser",
+            "eu.chainfire.supersu.pro", "com.kingouser.com"
+        ];
 
-        file.exists.overload().implementation = function(){
-            rootPath = false;
-            path = this.getAbsolutePath();
-            send("File.exists() called! with path: " + path.toString());
-            for (String i : paths) {
-                for (String j : filenames) {
-                    if path.equals(i+'/'+j){
-                        rootPath = true;
-                    }
+        var RootBinaries = ["su", "busybox", "supersu", ".su", "mu", "su2", ".su2", "Superuser.apk", "superuser.apk", "KingoUser.apk", "SuperSu.apk"];
+
+        var RootProperties = {
+            "ro.build.selinux": "1",
+            "ro.debuggable": "0",
+            "service.adb.root": "0",
+            "ro.secure": "1"
+        };
+
+        var RootPropertiesKeys = [];
+
+        for (var k in RootProperties) RootPropertiesKeys.push(k);
+
+        var pkgManager = Java.use("android.app.ApplicationPackageManager");
+
+        var Runtime = Java.use('java.lang.Runtime');
+
+        var NativeFile = Java.use('java.io.File');
+
+        var String = Java.use('java.lang.String');
+
+        var SystemProperties = Java.use('android.os.SystemProperties');
+
+        var BufferedReader = Java.use('java.io.BufferedReader');
+
+        var ProcessBuilder = Java.use('java.lang.ProcessBuilder');
+
+        var StringBuffer = Java.use('java.lang.StringBuffer');
+
+        var loaded_classes = Java.enumerateLoadedClassesSync();
+
+        send("Loaded " + loaded_classes.length + " classes!");
+
+        var useKeyInfo = false;
+
+        var useProcessManager = false;
+
+        send("loaded: " + loaded_classes.indexOf('java.lang.ProcessManager'));
+
+        if (loaded_classes.indexOf('java.lang.ProcessManager') != -1) {
+            try {
+                useProcessManager = true;
+                var ProcessManager = Java.use('java.lang.ProcessManager');
+            } catch (err) {
+                send("ProcessManager Hook failed: " + err);
+            }
+        } else {
+            send("ProcessManager hook not loaded");
+        }
+
+        var KeyInfo = null;
+
+        if (loaded_classes.indexOf('android.security.keystore.KeyInfo') != -1) {
+            try {
+                //useKeyInfo = true;
+                //var KeyInfo = Java.use('android.security.keystore.KeyInfo');
+            } catch (err) {
+                send("KeyInfo Hook failed: " + err);
+            }
+        } else {
+            send("KeyInfo hook not loaded");
+        }
+
+        pkgManager.getPackageInfo.overload('java.lang.String', 'int').implementation = function(pname, flags) {
+            var shouldFakePackage = (RootPackages.indexOf(pname) > -1);
+            if (shouldFakePackage) {
+                send("Bypass root check for package: " + pname);
+                pname = "set.package.name.to.a.fake.one.so.we.can.bypass.it";
+            }
+            return this.getPackageInfo.call(this, pname, flags);
+        };
+
+        NativeFile.exists.implementation = function() {
+            var name = NativeFile.getName.call(this);
+            var shouldFakeReturn = (RootBinaries.indexOf(name) > -1);
+            if (shouldFakeReturn) {
+                send("Bypass return value for binary: " + name);
+                return false;
+            } else {
+                return this.exists.call(this);
+            }
+        };
+
+        String.contains.implementation = function(name) {
+            if (name == "test-keys") {
+                send("Bypass test-keys check");
+                return false;
+            }
+            return this.contains.call(this, name);
+        };
+
+        var get = SystemProperties.get.overload('java.lang.String');
+
+        get.implementation = function(name) {
+            if (RootPropertiesKeys.indexOf(name) != -1) {
+                send("Bypass " + name);
+                return RootProperties[name];
+            }
+            return this.get.call(this, name);
+        };
+
+        Interceptor.attach(Module.findExportByName("libc.so", "fopen"), {
+            onEnter: function(args) {
+                var path = Memory.readCString(args[0]);
+                path = path.split("/");
+                var executable = path[path.length - 1];
+                var shouldFakeReturn = (RootBinaries.indexOf(executable) > -1)
+                if (shouldFakeReturn) {
+                    Memory.writeUtf8String(args[0], "/notexists");
+                    send("Bypass native fopen");
+                }
+            },
+            onLeave: function(retval) {
+
+            }
+        });
+
+        Interceptor.attach(Module.findExportByName("libc.so", "system"), {
+            onEnter: function(args) {
+                var cmd = Memory.readCString(args[0]);
+                send("SYSTEM CMD: " + cmd);
+                if (cmd.indexOf("getprop") != -1 || cmd == "mount" || cmd.indexOf("build.prop") != -1 || cmd == "id") {
+                    send("Bypass native system: " + cmd);
+                    Memory.writeUtf8String(args[0], "grep");
+                }
+                if (cmd == "su") {
+                    send("Bypass native system: " + cmd);
+                    Memory.writeUtf8String(args[0], "justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled");
+                }
+            },
+            onLeave: function(retval) {
+
+            }
+        });
+
+        BufferedReader.readLine.implementation = function() {
+            var text = this.readLine.call(this);
+            if (text === null) {
+                // just pass , i know it's ugly as hell but test != null won't work :(
+            } else {
+                var shouldFakeRead = (text.indexOf("ro.build.tags=test-keys") > -1);
+                if (shouldFakeRead) {
+                    send("Bypass build.prop file read");
+                    text = text.replace("ro.build.tags=test-keys", "ro.build.tags=release-keys");
                 }
             }
-            if rootPath {
-                res = false;
-                send("Hooked Successfully! Modified result to false");
-            } else{
-                res = this.exists();
-            }
-            return res;
+            return text;
         };
 
-        var string = Java.use("java.lang.String");
-        string.contains.overload("java.lang.String").implementation = function(param1) {
-            send("String.contains() called! with param: " + param1.toString());
-            if param1.equals("test-keys"){
-                res = false;
-            } else {
-                res = this.contains(param1);
-            }
-            return res;
-        }; 
+        if (useProcessManager) {
+            var ProcManExec = ProcessManager.exec.overload('[Ljava.lang.String;', '[Ljava.lang.String;', 'java.io.File', 'boolean');
+            var ProcManExecVariant = ProcessManager.exec.overload('[Ljava.lang.String;', '[Ljava.lang.String;', 'java.lang.String', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'boolean');
 
-        var runtime = Java.use("java.lang.Runtime.getRuntime");
-        runtime.exec.overload("java.lang.String").implementation = function(param1) {
-           send("exec() called! with param: " + param1.toString());
-            if (param1.equals("su") or param1.equals("which su")){
-                res = false;
-            } else {
-                res = this.contains(param1);
-            }
-            return res;
-        };
+            ProcManExec.implementation = function(cmd, env, workdir, redirectstderr) {
+                var fake_cmd = cmd;
+                for (var i = 0; i < cmd.length; i = i + 1) {
+                    var tmp_cmd = cmd[i];
+                    if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
+                        var fake_cmd = ["grep"];
+                        send("Bypass " + cmdarr + " command");
+                    }
 
+                    if (tmp_cmd == "su") {
+                        var fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
+                        send("Bypass " + cmdarr + " command");
+                    }
+                }
+                return ProcManExec.call(this, fake_cmd, env, workdir, redirectstderr);
+            };
+
+            ProcManExecVariant.implementation = function(cmd, env, directory, stdin, stdout, stderr, redirect) {
+                var fake_cmd = cmd;
+                for (var i = 0; i < cmd.length; i = i + 1) {
+                    var tmp_cmd = cmd[i];
+                    if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
+                        var fake_cmd = ["grep"];
+                        send("Bypass " + cmdarr + " command");
+                    }
+
+                    if (tmp_cmd == "su") {
+                        var fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
+                        send("Bypass " + cmdarr + " command");
+                    }
+                }
+                return ProcManExecVariant.call(this, fake_cmd, env, directory, stdin, stdout, stderr, redirect);
+            };
+        }
+
+        if (useKeyInfo) {
+            KeyInfo.isInsideSecureHardware.implementation = function() {
+                send("Bypass isInsideSecureHardware");
+                return true;
+            }
+        }
     });
-    send("Java ready");
 }
 ```
 
@@ -421,7 +576,7 @@ if(Java.available){
     Java.perform(function () {
         var mainActivity = Java.use("com.isrc.VulnApp6.Domain.MainActivity");
         mainActivity.a.overload().implementation = function(){
-            send("checkRunningProcesses() called!";
+            send("checkRunningProcesses() called!");
             res = false;
             send("Hooked Successfully! Modified result to false");
             return res;
