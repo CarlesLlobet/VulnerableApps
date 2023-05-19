@@ -2,6 +2,8 @@
 
 Some vulnerable Android applications have been developed in order to demonstrate really basic concepts of security when developing mobile applications.
 
+<a href="https://www.buymeacoffee.com/carlesllobet" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+
 In a BlackBox scenario, we would only have the application installed on the device, but we will assume we have been able to extract the apk in a Rooted Device. 
 The command for extracting an installed apk is shown below (where com.isrc.VulnApp0 would be the packagename of the application to extract):
 
